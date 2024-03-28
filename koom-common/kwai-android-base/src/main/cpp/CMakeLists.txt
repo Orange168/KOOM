@@ -7,8 +7,14 @@ project(${TARGET})
 # Sets the minimum version of CMake required to build the native library.
 cmake_minimum_required(VERSION 3.4.1)
 
+#-Wall：启用所有警告信息，帮助开发者发现潜在的代码问题。
+#-Wextra：启用额外的警告信息。
+#-Werror=exit-time-destructors：把“退出时析构函数”相关的警告转化为错误，这通常用于确保析构代码没有潜在的问题。
+#-D_FILE_OFFSET_BITS=64：指定文件偏移使用64位，允许处理大于2GB的文件。
+#-D_7ZIP_ST：定义了宏_7ZIP_ST，通常用来告诉编译器7zip库应该以单线程模式运行。
 add_compile_options(-Wall -Wextra -Wexit-time-destructors -D_FILE_OFFSET_BITS=64 -D_7ZIP_ST)
 #liblog
+# -Oz：优化选项，用于在不损失程序性能的前提下，尽可能压缩代码体积，-Oz比-Os更加注重体积的压缩。
 add_compile_options(-DLIBLOG_LOG_TAG=1006 -DSNET_EVENT_LOG_TAG=1397638484 -Oz)
 
 include_directories(
@@ -72,7 +78,7 @@ add_library( # Sets the name of the library.
 
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because CMake includes system libraries in the search path by
-# default, you only need to specify the name of the public NDK library
+# default, you only need to specify the name of the public NDK
 # you want to add. CMake verifies that the library exists before
 # completing its build.
 

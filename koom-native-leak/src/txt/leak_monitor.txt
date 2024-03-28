@@ -177,54 +177,40 @@ void LeakMonitor::SetMonitorThreshold(size_t threshold) {
   alloc_threshold_ = threshold;
 }
 
-// GetLeakAllocs方法用于获取当前存在的内存泄漏分配记录
 std::vector<std::shared_ptr<AllocRecord>> LeakMonitor::GetLeakAllocs() {
-  // KCHECK宏检查监控器是否已安装，如果未安装，则抛出异常
   KCHECK(has_install_monitor_);
-
-  // 调用MemoryAnalyzer类的CollectUnreachableMem方法来收集不可达的内存块信息
   auto unreachable_allocs = memory_analyzer_->CollectUnreachableMem();
-
-  // 创建两个vector来存储活动分配和泄漏分配的记录
   std::vector<std::shared_ptr<AllocRecord>> live_allocs;
   std::vector<std::shared_ptr<AllocRecord>> leak_allocs;
 
-  // 定义一个lambda表达式来收集活动内存块
-  // collect_func是一个函数对象，它接受一个AllocRecord的shared_ptr并将其添加到live_allocs中
+  // Collect live memory blocks
   auto collect_func = [&](std::shared_ptr<AllocRecord> &alloc_info) -> void {
     live_allocs.push_back(alloc_info);
   };
-
-  // 使用collect_func函数对象来遍历live_alloc_records_（一个内部映射，存储所有活动的内存分配）
   live_alloc_records_.Dump(collect_func);
 
-  // 定义一个lambda表达式来判断一个活动分配是否是一个泄漏
-  // is_leak接受一个不可达内存块和一个活动分配的引用，返回一个bool值表示是否泄漏
   auto is_leak = [&](decltype(unreachable_allocs)::value_type &unreachable,
                      std::shared_ptr<AllocRecord> &live) -> bool {
-    // 使用CONFUSE宏来混淆地址，防止地址被优化掉
     auto live_start = CONFUSE(live->address);
     auto live_end = live_start + live->size;
     auto unreachable_start = unreachable.first;
     auto unreachable_end = unreachable_start + unreachable.second;
-    // 判断活动分配是否与不可达内存块有重叠，如果是，则认为是泄漏
+    // TODO why
     return live_start == unreachable_start ||
            live_start >= unreachable_start && live_end <= unreachable_end;
   };
-
-  // 遍历所有活动分配，检查它们是否与不可达内存块重叠
+  // Check leak allocation (unreachable && not free)
   for (auto &live : live_allocs) {
     for (auto &unreachable : unreachable_allocs) {
-      // 如果发现活动分配是泄漏的，将其添加到leak_allocs中，并从活动分配中移除
       if (is_leak(unreachable, live)) {
         leak_allocs.push_back(live);
-        // 移除泄漏的分配记录
+        // Just remove leak allocation(never be free)
+        // live->address has been confused, we need to revert it first
         UnregisterAlloc(CONFUSE(live->address));
       }
     }
   }
 
-  // 返回包含所有泄漏分配记录的vector
   return leak_allocs;
 }
 

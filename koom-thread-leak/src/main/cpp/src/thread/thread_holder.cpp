@@ -10,12 +10,15 @@ namespace koom {
 
 const char *holder_tag = "koom-holder";
 
-void ThreadHolder::AddThread(int tid, pthread_t threadId, bool isThreadDetached,
-                             int64_t start_time, ThreadCreateArg *create_arg) {
+vExplain
+    void ThreadHolder::AddThread(int tid, pthread_t threadId, bool isThreadDetached,
+                            int64_t start_time, ThreadCreateArg *create_arg) {
+  // 1. 检查并确保当前线程ID没有在threadMap中，避免重复添加
   bool valid = threadMap.count(threadId) > 0;
   if (valid) return;
 
   koom::Log::info(holder_tag, "AddThread tid:%d pthread_t:%p", tid, threadId);
+  // 2. 初始化ThreadItem条目，设置线程参数，清空创建线程时的调用栈
   auto &item = threadMap[threadId];
   item.Clear();
   item.thread_internal_id = threadId;
@@ -25,14 +28,14 @@ void ThreadHolder::AddThread(int tid, pthread_t threadId, bool isThreadDetached,
   item.id = tid;
   std::string &stack = item.create_call_stack;
   stack.assign("");
+
   try {
-    // native stack
+    // 3. 填充本地的调用栈（native stack）信息
     int ignoreLines = 0;
     for (int index = 0; index < koom::Constant::kMaxCallStackDepth; ++index) {
       uintptr_t p = create_arg->pc[index];
       if (p == 0) continue;
-      // koom::Log::info(holder_tag, "unwind native callstack #%d pc%p", index,
-      // p);
+      // koom::Log::info(holder_tag, "unwind native callstack #%d pc%p", index, p);
       std::string line = koom::CallStack::SymbolizePc(p, index - ignoreLines);
       if (line.empty()) {
         ignoreLines++;
@@ -41,7 +44,7 @@ void ThreadHolder::AddThread(int tid, pthread_t threadId, bool isThreadDetached,
         stack.append(line);
       }
     }
-    // java stack
+    // 4. 填充Java调用栈（java stack）信息，并处理空白堆栈情况
     std::vector<std::string> splits =
         koom::Util::Split(create_arg->java_stack.str(), '\n');
     for (const auto &split : splits) {
@@ -52,11 +55,14 @@ void ThreadHolder::AddThread(int tid, pthread_t threadId, bool isThreadDetached,
       line.append("\n");
       stack.append(line);
     }
-    //空白堆栈，去掉##
+    // 如果堆栈是空（只有开始处的##），则将堆栈字符串重置为空
     if (stack.size() == 3) stack.assign("");
   } catch (const std::bad_alloc &) {
+    // 处理内存分配失败的异常情况
     stack.assign("error:bad_alloc");
   }
+
+  // 释放创建线程时传入的参数
   delete create_arg;
   koom::Log::info(holder_tag, "AddThread finish");
 }

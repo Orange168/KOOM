@@ -167,6 +167,10 @@ void ThreadHooker::HookThreadExit(void *return_value) {
   if (!hookEnabled()) pthread_exit(return_value);
 
   koom::Log::info(thread_tag, "HookThreadExit");
+  /**
+   * 使用syscall(SYS_gettid)获取当前线程的ID，并将其转换为整数(int)类型。
+    使用prctl(PR_GET_NAME, thread_name)获取当前线程的名称，并存储在thread_name这个字符数组中。
+   */
   int tid = (int)syscall(SYS_gettid);
   char thread_name[16]{};
   prctl(PR_GET_NAME, thread_name);
